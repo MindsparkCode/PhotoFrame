@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <color name="colorPrimary">#00897b</color>
+    <color name="colorPrimaryDark">#00695c</color>
+    <color name="colorAccent">#009688</color>
+    <color name="colorBackground">#000000</color>
+
+    <color name="buttonAccentNormal">#536dfe</color>
+    <color name="buttonAccentPressed">#3f51b5</color>
+    <color name="buttonDarkNormal">#575757</color>
+    <color name="buttonDarkPressed">#444343</color>
+    <color name="buttonDisabled">#55000000</color>
+
+    <color name="color_almost_white">#cdcdcd</color>
+
+    <color name="material_dark">#ff303030</color>
+
+</resources>
