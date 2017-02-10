@@ -1,7 +1,6 @@
 package example.vlado.photoframe;
 
 import android.Manifest;
-import android.animation.Animator;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,8 +28,8 @@ import java.util.List;
 import example.vlado.photoframe.dialog.SettingsDialogFragment;
 import example.vlado.photoframe.util.ClickRecognizer;
 import example.vlado.photoframe.util.FilesUtil;
+import example.vlado.photoframe.util.RevealAnimationUtil;
 import example.vlado.photoframe.util.SharedPrefHelper;
-import io.codetail.animation.ViewAnimationUtils;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
@@ -40,12 +39,11 @@ public class PhotoFrameActivity extends AppCompatActivity {
 
     private List<File> imageList;
     private ViewPager imageViewPager;
-    private ImageView slideshowIconImageView;
+    private ImageView revealEffectImageView;
     private TextView releaseForSettingsTextView;
     private Drawable pauseIcon, playIcon;
     private Handler changePhotoHandler = new Handler();
 
-    private boolean viewPagerDragged = false;
     private boolean isSlideshowRunning;
 
     private Settings settings;
@@ -54,9 +52,7 @@ public class PhotoFrameActivity extends AppCompatActivity {
         @Override
         public void run() {
             if (imageList != null && imageList.size() > 1) {
-                if (!viewPagerDragged) {
-                    imageViewPager.setCurrentItem((imageViewPager.getCurrentItem() + 1) % imageList.size());
-                }
+                imageViewPager.setCurrentItem((imageViewPager.getCurrentItem() + 1) % imageList.size());
                 changePhotoHandler.postDelayed(this, getDelayInMs());
             }
         }
@@ -72,13 +68,15 @@ public class PhotoFrameActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         imageViewPager = (ViewPager) findViewById(R.id.image_view_pager);
-        slideshowIconImageView = (ImageView) findViewById(R.id.slideshow_status_icon_image_view);
+        revealEffectImageView = (ImageView) findViewById(R.id.reveal_effect_image_view);
         releaseForSettingsTextView = (TextView) findViewById(R.id.release_for_settings_text_view);
 
         final Animation pulsingAnimation = AnimationUtils.loadAnimation(this, R.anim.pulsing_animation);
 
         imageViewPager.setOnTouchListener(new ClickRecognizer(new ClickRecognizer.OnClickListener() {
 
+            int x = 0;
+            int y = 0;
             private Handler startPulsingHandler = new Handler();
 
             @Override
@@ -88,27 +86,28 @@ public class PhotoFrameActivity extends AppCompatActivity {
                 }
                 if (isSlideshowRunning) {
                     pauseSlideshow();
-                    slideshowIconImageView.setImageDrawable(pauseIcon);
-                    showRevealAnimation(slideshowIconImageView, x, y, 500, true);
+                    revealEffectImageView.setImageDrawable(pauseIcon);
+                    RevealAnimationUtil.getRevealAndReverseAnimator(revealEffectImageView, x, y, 500).start();
                 } else {
-                    startSlideshow();
-                    slideshowIconImageView.setImageDrawable(playIcon);
-                    showRevealAnimation(slideshowIconImageView, x, y, 500, true);
+                    startSlideshowIfDelaySet();
+                    revealEffectImageView.setImageDrawable(playIcon);
+                    RevealAnimationUtil.getRevealAndReverseAnimator(revealEffectImageView, x, y, 500).start();
                 }
             }
 
             @Override
             public void onLongClick() {
-                slideshowIconImageView.setVisibility(View.INVISIBLE);
                 startPulsingHandler.removeCallbacksAndMessages(null);
                 releaseForSettingsTextView.setVisibility(View.INVISIBLE);
                 releaseForSettingsTextView.clearAnimation();
+                RevealAnimationUtil.getReverseRevealAnimation(revealEffectImageView, x, y, 500, true).start();
                 showSettingsDialog();
             }
 
             @Override
             public void onLongClickInterrupted() {
-                slideshowIconImageView.setVisibility(View.INVISIBLE);
+                revealEffectImageView.setVisibility(View.INVISIBLE);
+                revealEffectImageView.clearAnimation();
                 startPulsingHandler.removeCallbacksAndMessages(null);
                 releaseForSettingsTextView.setVisibility(View.INVISIBLE);
                 releaseForSettingsTextView.clearAnimation();
@@ -116,8 +115,11 @@ public class PhotoFrameActivity extends AppCompatActivity {
 
             @Override
             public void onLongClickStart(int x, int y) {
-                slideshowIconImageView.setImageDrawable(null);
-                showRevealAnimation(slideshowIconImageView, x, y, 1000, false);
+                this.x = x;
+                this.y = y;
+
+                revealEffectImageView.setImageDrawable(null);
+                RevealAnimationUtil.getRevealAnimation(revealEffectImageView, x, y, 1000, false).start();
                 startPulsingHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -181,7 +183,7 @@ public class PhotoFrameActivity extends AppCompatActivity {
             imageViewPager.setAdapter(new ImageViewPagerAdapter(this, imageList));
         }
 
-        startSlideshow();
+        startSlideshowIfDelaySet();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -192,7 +194,7 @@ public class PhotoFrameActivity extends AppCompatActivity {
         SharedPrefHelper.saveSettings(settings, this);
     }
 
-    private void startSlideshow() {
+    private void startSlideshowIfDelaySet() {
         changePhotoHandler.removeCallbacksAndMessages(null);
         if (getDelayInMs() != 0) {
             isSlideshowRunning = true;
@@ -205,42 +207,6 @@ public class PhotoFrameActivity extends AppCompatActivity {
         changePhotoHandler.removeCallbacksAndMessages(null);
     }
 
-    private void showRevealAnimation(final View view, int x, int y, int duration, final boolean dissappear)
-    {
-        view.setVisibility(View.VISIBLE);
-
-        float finalRadius = (float) Math.hypot(view.getWidth(), view.getHeight());
-
-        Animator revealAnimator = ViewAnimationUtils.createCircularReveal(view, x, y, 0, finalRadius);
-        revealAnimator.setDuration(duration);
-
-        revealAnimator.start();
-
-        revealAnimator.addListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animator) {
-                if (dissappear) {
-                    view.setVisibility(View.INVISIBLE);
-                }
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animator) {
-
-            }
-        });
-    }
-
     private void showSettingsDialog() {
         SettingsDialogFragment settingsDialogFragment = new SettingsDialogFragment();
         settingsDialogFragment.show(getSupportFragmentManager(), "settings");
@@ -251,7 +217,7 @@ public class PhotoFrameActivity extends AppCompatActivity {
         if (requestCode == REQUEST_CODE_READ_EXTERNAL_STORAGE) {
             if (grantResults[0] == PERMISSION_GRANTED) {
                 loadSettings(SharedPrefHelper.getSettings(this));
-                startSlideshow();
+                startSlideshowIfDelaySet();
             } else {
                 finish();
             }

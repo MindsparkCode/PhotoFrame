@@ -16,14 +16,18 @@ public class ClickRecognizer implements View.OnTouchListener {
 
     private Handler handler = new Handler();
     private boolean shouldRegisterAsClick = false;
+    private boolean longClickStarted = false;
+    private boolean longClickFinished = false;
     private float firstX;
-    private long downTimestamp;
     private OnClickListener listener;
 
     public interface OnClickListener {
         void onClick(int x, int y);
+
         void onLongClick();
+
         void onLongClickInterrupted();
+
         void onLongClickStart(int x, int y);
     }
 
@@ -35,40 +39,45 @@ public class ClickRecognizer implements View.OnTouchListener {
     public boolean onTouch(View view, final MotionEvent motionEvent) {
         switch (motionEvent.getAction()) {
             case MotionEvent.ACTION_DOWN:
-
                 firstX = motionEvent.getX();
                 shouldRegisterAsClick = true;
-                downTimestamp = System.currentTimeMillis();
+                longClickStarted = false;
+                longClickFinished = false;
 
                 handler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
+                        shouldRegisterAsClick = false;
+                        longClickStarted = true;
                         listener.onLongClickStart((int) motionEvent.getX(), (int) motionEvent.getY());
+
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                longClickFinished = true;
+                            }
+                        }, LONG_CLICK_TIMEOUT);
                     }
                 }, TAP_TIMEOUT);
 
                 break;
 
-        case MotionEvent.ACTION_UP:
-                long elapsedTime = System.currentTimeMillis() - downTimestamp;
-                if (elapsedTime < (TAP_TIMEOUT + LONG_CLICK_TIMEOUT)) {
+            case MotionEvent.ACTION_UP:
+                if (shouldRegisterAsClick) {
                     handler.removeCallbacksAndMessages(null);
-                    if (elapsedTime < TAP_TIMEOUT) {
-                        if (shouldRegisterAsClick) {
-                            listener.onClick((int) motionEvent.getX(), (int) motionEvent.getY());
-                        }
-                    } else {
-                        listener.onLongClickInterrupted();
-                    }
-                } else {
+                    listener.onClick((int) motionEvent.getX(), (int) motionEvent.getY());
+                } else if (longClickFinished) {
                     listener.onLongClick();
+                } else if (longClickStarted) {
+                    listener.onLongClickInterrupted();
                 }
-                break;
 
             case MotionEvent.ACTION_MOVE:
                 if (Math.abs(motionEvent.getX() - firstX) > 10) {
-                    shouldRegisterAsClick = false;
-                    handler.removeCallbacksAndMessages(null);
+                    if (shouldRegisterAsClick) {
+                        shouldRegisterAsClick = false;
+                        handler.removeCallbacksAndMessages(null);
+                    }
                 }
                 break;
         }
