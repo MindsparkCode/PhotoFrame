@@ -3,7 +3,6 @@ package example.vlado.photoframe.util;
 import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewConfiguration;
 
 /**
  * Created by vlado on 30/01/2017.
@@ -11,8 +10,8 @@ import android.view.ViewConfiguration;
 
 public class ClickRecognizer implements View.OnTouchListener {
 
-    public static int TAP_TIMEOUT = 2 * ViewConfiguration.getTapTimeout();
-    public static int LONG_CLICK_TIMEOUT = 2 * ViewConfiguration.getLongPressTimeout();
+    public static int TAP_TIMEOUT = 350;
+    public static int LONG_CLICK_TIMEOUT = 1000;
 
     private Handler handler = new Handler();
     private boolean shouldRegisterAsClick = false;
@@ -37,6 +36,7 @@ public class ClickRecognizer implements View.OnTouchListener {
 
     @Override
     public boolean onTouch(View view, final MotionEvent motionEvent) {
+
         switch (motionEvent.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 firstX = motionEvent.getX();
@@ -49,8 +49,8 @@ public class ClickRecognizer implements View.OnTouchListener {
                     public void run() {
                         shouldRegisterAsClick = false;
                         longClickStarted = true;
-                        listener.onLongClickStart((int) motionEvent.getX(), (int) motionEvent.getY());
 
+                        listener.onLongClickStart((int) motionEvent.getX(), (int) motionEvent.getY());
                         handler.postDelayed(new Runnable() {
                             @Override
                             public void run() {
@@ -59,18 +59,18 @@ public class ClickRecognizer implements View.OnTouchListener {
                         }, LONG_CLICK_TIMEOUT);
                     }
                 }, TAP_TIMEOUT);
-
-                break;
+                return true;
 
             case MotionEvent.ACTION_UP:
+                handler.removeCallbacksAndMessages(null);
                 if (shouldRegisterAsClick) {
-                    handler.removeCallbacksAndMessages(null);
                     listener.onClick((int) motionEvent.getX(), (int) motionEvent.getY());
                 } else if (longClickFinished) {
                     listener.onLongClick();
                 } else if (longClickStarted) {
                     listener.onLongClickInterrupted();
                 }
+                break;
 
             case MotionEvent.ACTION_MOVE:
                 if (Math.abs(motionEvent.getX() - firstX) > 10) {

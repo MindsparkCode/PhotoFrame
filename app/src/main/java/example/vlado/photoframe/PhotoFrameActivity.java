@@ -27,8 +27,8 @@ import java.util.List;
 
 import example.vlado.photoframe.dialog.SettingsDialogFragment;
 import example.vlado.photoframe.util.ClickRecognizer;
+import example.vlado.photoframe.util.CompatAnimationUtils;
 import example.vlado.photoframe.util.FilesUtil;
-import example.vlado.photoframe.util.RevealAnimationUtil;
 import example.vlado.photoframe.util.SharedPrefHelper;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
@@ -36,6 +36,7 @@ import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 public class PhotoFrameActivity extends AppCompatActivity {
 
     private static final String TAG = PhotoFrameActivity.class.getSimpleName();
+    private static int REQUEST_CODE_READ_EXTERNAL_STORAGE = 0;
 
     private List<File> imageList;
     private ViewPager imageViewPager;
@@ -53,18 +54,21 @@ public class PhotoFrameActivity extends AppCompatActivity {
         public void run() {
             if (imageList != null && imageList.size() > 1) {
                 imageViewPager.setCurrentItem((imageViewPager.getCurrentItem() + 1) % imageList.size());
-                changePhotoHandler.postDelayed(this, getDelayInMs());
+                changePhotoHandler.postDelayed(this, settings.getDelayInMs());
             }
         }
     };
-
-    private int REQUEST_CODE_READ_EXTERNAL_STORAGE = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.activity_photo_frame);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+            setContentView(R.layout.activity_photo_frame);
+        } else {
+            setContentView(R.layout.activity_photo_frame_pre_ics);
+        }
+
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         imageViewPager = (ViewPager) findViewById(R.id.image_view_pager);
@@ -81,17 +85,23 @@ public class PhotoFrameActivity extends AppCompatActivity {
 
             @Override
             public void onClick(int x, int y) {
-                if (getDelayInMs() == 0) {
+                if (settings.getDelayInMs() == 0 || revealEffectImageView.getVisibility() == View.VISIBLE) {
                     return;
                 }
                 if (isSlideshowRunning) {
                     pauseSlideshow();
                     revealEffectImageView.setImageDrawable(pauseIcon);
-                    RevealAnimationUtil.getRevealAndReverseAnimator(revealEffectImageView, x, y, 500).start();
                 } else {
                     startSlideshowIfDelaySet();
                     revealEffectImageView.setImageDrawable(playIcon);
-                    RevealAnimationUtil.getRevealAndReverseAnimator(revealEffectImageView, x, y, 500).start();
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+                    CompatAnimationUtils.getRevealAndReverseAnimator(revealEffectImageView, x, y, 500).start();
+                } else {
+                    // Animation won't start without setting the view's visibility to VISIBLE prior to starting the animation
+                    revealEffectImageView.setVisibility(View.VISIBLE);
+                    CompatAnimationUtils.getAlphaAndReverseAnimation(revealEffectImageView, 500).startNow();
                 }
             }
 
@@ -100,8 +110,14 @@ public class PhotoFrameActivity extends AppCompatActivity {
                 startPulsingHandler.removeCallbacksAndMessages(null);
                 releaseForSettingsTextView.setVisibility(View.INVISIBLE);
                 releaseForSettingsTextView.clearAnimation();
-                RevealAnimationUtil.getReverseRevealAnimation(revealEffectImageView, x, y, 500, true).start();
                 showSettingsDialog();
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+                    CompatAnimationUtils.getReverseRevealAnimation(revealEffectImageView, x, y, 500, true).start();
+                } else {
+                    revealEffectImageView.setVisibility(View.VISIBLE);
+                    CompatAnimationUtils.getReverseAlphaAnimation(revealEffectImageView, 500, true).startNow();
+                }
             }
 
             @Override
@@ -119,7 +135,6 @@ public class PhotoFrameActivity extends AppCompatActivity {
                 this.y = y;
 
                 revealEffectImageView.setImageDrawable(null);
-                RevealAnimationUtil.getRevealAnimation(revealEffectImageView, x, y, 1000, false).start();
                 startPulsingHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -128,6 +143,13 @@ public class PhotoFrameActivity extends AppCompatActivity {
                         releaseForSettingsTextView.setVisibility(View.VISIBLE);
                     }
                 }, 600);
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+                    CompatAnimationUtils.getRevealAnimation(revealEffectImageView, x, y, 1000, false).start();
+                } else {
+                    revealEffectImageView.setVisibility(View.VISIBLE);
+                    CompatAnimationUtils.getAlphaAnimation(revealEffectImageView, 1000, false).startNow();
+                }
             }
         }));
 
@@ -139,7 +161,18 @@ public class PhotoFrameActivity extends AppCompatActivity {
             pauseIcon = getResources().getDrawable(R.drawable.ic_pause_black_24dp);
         }
 
-        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_CODE_READ_EXTERNAL_STORAGE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_CODE_READ_EXTERNAL_STORAGE);
+        } else {
+            loadSettings(SharedPrefHelper.getSettings(this));
+            startSlideshowIfDelaySet();
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        hideSystemUI();
     }
 
     @Override
@@ -155,33 +188,21 @@ public class PhotoFrameActivity extends AppCompatActivity {
         EventBus.getDefault().unregister(this);
     }
 
-    private int getDelayInMs() {
-        return settings.getDelay() * 1000;
-    }
-
-    private String getPhotosFolderPath() {
-        return settings.getPhotosFolderPath();
-    }
-
-
-    private void loadSettings(Settings settings) {
+    private void loadSettings(Settings newSettings) {
         pauseSlideshow();
-        String oldPath = null;
-        if (this.settings != null) {
-            oldPath = getPhotosFolderPath();
-        }
-        this.settings = settings;
 
-        if (oldPath == null || !oldPath.equals(getPhotosFolderPath())) {
-            imageList = FilesUtil.loadImageList(getPhotosFolderPath());
+        if (settings == null || !settings.equals(newSettings)) {
+            imageList = FilesUtil.loadImageList(newSettings.getPhotosFolderPath(), newSettings.isIncludeSubdirectories());
 
-            if (imageList == null) {
+            if (imageList.size() < 1) {
                 showSettingsDialog();
                 Toast.makeText(this, R.string.no_photos_to_load, Toast.LENGTH_LONG).show();
                 return;
             }
             imageViewPager.setAdapter(new ImageViewPagerAdapter(this, imageList));
         }
+
+        this.settings = newSettings;
 
         startSlideshowIfDelaySet();
     }
@@ -196,9 +217,9 @@ public class PhotoFrameActivity extends AppCompatActivity {
 
     private void startSlideshowIfDelaySet() {
         changePhotoHandler.removeCallbacksAndMessages(null);
-        if (getDelayInMs() != 0) {
+        if (settings != null && settings.getDelayInMs() != 0) {
             isSlideshowRunning = true;
-            changePhotoHandler.postDelayed(changePhotoRunnable, getDelayInMs());
+            changePhotoHandler.postDelayed(changePhotoRunnable, settings.getDelayInMs());
         }
     }
 
@@ -221,6 +242,18 @@ public class PhotoFrameActivity extends AppCompatActivity {
             } else {
                 finish();
             }
+        }
+    }
+
+    private void hideSystemUI() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         }
     }
 }

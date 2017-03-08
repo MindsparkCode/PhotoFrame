@@ -2,7 +2,9 @@ package example.vlado.photoframe.dialog;
 
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatDialogFragment;
 import android.text.Editable;
@@ -10,6 +12,9 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import com.wefika.horizontalpicker.HorizontalPicker;
@@ -18,8 +23,8 @@ import org.greenrobot.eventbus.EventBus;
 
 import example.vlado.photoframe.R;
 import example.vlado.photoframe.Settings;
-import example.vlado.photoframe.util.SharedPrefHelper;
 import example.vlado.photoframe.util.FilesUtil;
+import example.vlado.photoframe.util.SharedPrefHelper;
 
 /**
  * Created by vlado on 28/01/2017.
@@ -30,44 +35,66 @@ public class SettingsDialogFragment extends AppCompatDialogFragment implements D
     private Settings settings;
     private AlertDialog dialog;
 
-    private HorizontalPicker numberPicker;
+    private HorizontalPicker delayNumberPicker;
+    private EditText delayEditText;
+
     private TextView photosFolderTextView;
     private TextView choosePhotoFolderTextview;
 
     private String[] pickerValues = new String[]{"0", "5", "10", "15", "20", "30", "50", "100", "200", "500", "1000", "2000", "5000"};
+    private CheckBox includeSubdirectoriesCheckBox;
 
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
         LayoutInflater inflater = getActivity().getLayoutInflater();
-        View view = inflater.inflate(R.layout.dialog_settings, null);
+        View view;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+            view = inflater.inflate(R.layout.dialog_settings, null);
+        } else {
+            view = inflater.inflate(R.layout.dialog_settings_pre_ics, null);
+        }
+
+        settings = SharedPrefHelper.getSettings(getContext());
 
         builder.setView(view)
                 .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int id) {
-                        settings.setDelay(Integer.parseInt(pickerValues[numberPicker.getSelectedItem()]));
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+                            settings.setDelay(Integer.parseInt(pickerValues[delayNumberPicker.getSelectedItem()]));
+                        } else {
+                            settings.setDelay(Integer.parseInt(delayEditText.getText().toString()));
+                        }
                         settings.setPhotosFolderPath(photosFolderTextView.getText().toString());
+                        settings.setIncludeSubdirectories(includeSubdirectoriesCheckBox.isChecked());
                         EventBus.getDefault().post(settings);
-                    }
-                })
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        SettingsDialogFragment.this.getDialog().cancel();
                     }
                 })
                 .setTitle(R.string.settings);
 
+        boolean canCancel = FilesUtil.isPhotoPathValid(settings.getPhotosFolderPath(), settings.isIncludeSubdirectories());
+        if (canCancel) {
+            builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    SettingsDialogFragment.this.getDialog().cancel();
+                }
+            });
+        }
+
         dialog = builder.create();
 
-        settings = SharedPrefHelper.getSettings(getContext());
-
-        numberPicker = (HorizontalPicker) view.findViewById(R.id.delay_number_picker);
-        numberPicker.setValues(pickerValues);
-        String currentDelay = settings.getDelay() + "";
-        int currentDelayIndex = java.util.Arrays.binarySearch(pickerValues, currentDelay);
-        if (currentDelayIndex > -1) {
-            numberPicker.setSelectedItem(currentDelayIndex);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+            delayNumberPicker = (HorizontalPicker) view.findViewById(R.id.delay_number_picker);
+            delayNumberPicker.setValues(pickerValues);
+            String currentDelay = settings.getDelay() + "";
+            int currentDelayIndex = java.util.Arrays.binarySearch(pickerValues, currentDelay);
+            if (currentDelayIndex > -1) {
+                delayNumberPicker.setSelectedItem(currentDelayIndex);
+            }
+        } else {
+            delayEditText = (EditText) view.findViewById(R.id.delay_edit_text);
+            delayEditText.setText(settings.getDelay() + "");
         }
 
         photosFolderTextView = (TextView) view.findViewById(R.id.photos_folder_text_view);
@@ -91,8 +118,7 @@ public class SettingsDialogFragment extends AppCompatDialogFragment implements D
 
             @Override
             public void afterTextChanged(Editable editable) {
-                boolean canCancel = FilesUtil.loadImageList(settings.getPhotosFolderPath()) != null;
-                checkIfPhotoPathValid(editable.toString(), canCancel);
+                checkIfPhotoPathValid(editable.toString(), includeSubdirectoriesCheckBox.isChecked());
             }
         });
 
@@ -104,29 +130,37 @@ public class SettingsDialogFragment extends AppCompatDialogFragment implements D
             }
         });
 
+        includeSubdirectoriesCheckBox = (CheckBox) view.findViewById(R.id.include_subdirectories_checkbox);
+        includeSubdirectoriesCheckBox.setChecked(settings.isIncludeSubdirectories());
+        includeSubdirectoriesCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                checkIfPhotoPathValid(photosFolderTextView.getText().toString(), includeSubdirectoriesCheckBox.isChecked());
+            }
+        });
+
         return dialog;
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        boolean canCancel = FilesUtil.loadImageList(settings.getPhotosFolderPath()) != null;
-        checkIfPhotoPathValid(photosFolderTextView.getText().toString(), canCancel);
+        checkIfPhotoPathValid(photosFolderTextView.getText().toString(), includeSubdirectoriesCheckBox.isChecked());
     }
 
-    private void checkIfPhotoPathValid(String path, boolean canCancel) {
-        Button positiveButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
-        Button negativeButton = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
+    private void checkIfPhotoPathValid(String path, boolean includeSubdirectories) {
+        boolean isPathValid = FilesUtil.isPhotoPathValid(path, includeSubdirectories);
 
-        if (FilesUtil.loadImageList(path) == null) {
-            photosFolderTextView.setError(getString(R.string.no_photos_to_load));
-            positiveButton.setEnabled(false);
-        } else {
-            photosFolderTextView.setError(null);
+        Button positiveButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (isPathValid) {
+            photosFolderTextView.setTextColor(includeSubdirectoriesCheckBox.getCurrentTextColor());
+            choosePhotoFolderTextview.setText(R.string.select_photo_folder);
             positiveButton.setEnabled(true);
+        } else {
+            photosFolderTextView.setTextColor(ContextCompat.getColor(getContext(), R.color.material_red));
+            choosePhotoFolderTextview.setText(R.string.select_valid_photo_folder);
+            positiveButton.setEnabled(false);
         }
-        negativeButton.setEnabled(canCancel);
-        dialog.setCancelable(canCancel);
     }
 
     private void showDirectoryChooserDialog() {
@@ -139,19 +173,4 @@ public class SettingsDialogFragment extends AppCompatDialogFragment implements D
         photosFolderTextView.setText(folderPath);
     }
 
-//    private void removeDividerFromPicker(NumberPicker picker) {
-//
-//        java.lang.reflect.Field[] pickerFields = NumberPicker.class.getDeclaredFields();
-//        for (java.lang.reflect.Field selectionDivider : pickerFields) {
-//            if (selectionDivider.getName().equals("mSelectionDivider")) {
-//                try {
-//                    selectionDivider.setAccessible(true);
-//                    selectionDivider.set(picker, null);
-//                } catch (IllegalArgumentException | IllegalAccessException | Resources.NotFoundException e) {
-//                    e.printStackTrace();
-//                }
-//                break;
-//            }
-//        }
-//    }
 }

@@ -21,6 +21,7 @@ public class SharedPrefHelper {
 
         edit.putInt(context.getString(R.string.key_delay), settings.getDelay());
         edit.putString(context.getString(R.string.key_photos_folder_path), settings.getPhotosFolderPath());
+        edit.putBoolean(context.getString(R.string.key_include_subdirectories), settings.isIncludeSubdirectories());
 
         edit.apply();
     }
@@ -33,6 +34,7 @@ public class SharedPrefHelper {
         settings.setDelay(preferences.getInt(context.getString(R.string.key_delay), 30));
         settings.setPhotosFolderPath(preferences.getString(context.getString(R.string.key_photos_folder_path),
                                 Environment.getExternalStorageDirectory().getAbsolutePath() + "/PhotoFrame"));
+        settings.setIncludeSubdirectories(preferences.getBoolean(context.getString(R.string.key_include_subdirectories), false));
 
         return settings;
     }

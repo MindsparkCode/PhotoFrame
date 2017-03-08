@@ -1,8 +1,9 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:picker="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
+    android:paddingLeft="@dimen/dimension_32dp"
+    android:paddingRight="@dimen/dimension_32dp"
     android:paddingTop="@dimen/dimension_16dp">
 
     <ScrollView
@@ -18,27 +19,22 @@
                 style="@style/TextAppearance.AppCompat.Medium"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/dimension_32dp"
-                android:layout_marginRight="@dimen/dimension_32dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/choose_delay" />
 
-            <com.wefika.horizontalpicker.HorizontalPicker
-                android:id="@+id/delay_number_picker"
-                style="@style/TextAppearance.AppCompat.Medium"
-                android:layout_width="wrap_content"
-                android:layout_height="70dp"
-                android:layout_gravity="center"
+            <EditText
+                android:id="@+id/delay_edit_text"
+                android:layout_width="60dp"
+                android:layout_height="50dp"
+                android:layout_gravity="center_horizontal"
+                android:gravity="center_horizontal"
                 android:hint="@string/delay"
-                android:textColor="@color/almost_white"
-                picker:dividerSize="@dimen/dimension_8dp" />
+                android:inputType="number" />
 
             <TextView
                 android:id="@+id/photos_folder_text_view"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/dimension_32dp"
-                android:layout_marginRight="@dimen/dimension_32dp"
                 android:ellipsize="start"
                 android:hint="@string/photos_folder" />
 
@@ -46,9 +42,7 @@
                 android:id="@+id/choose_photo_folder_text_view"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:layout_marginLeft="@dimen/dimension_32dp"
-                android:layout_marginRight="@dimen/dimension_32dp"
+                android:layout_marginBottom="6dp"
                 android:text="@string/select_photo_folder"
                 android:textColor="@color/colorAccent" />
 
@@ -56,10 +50,6 @@
                 android:id="@+id/include_subdirectories_checkbox"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="26dp"
-                android:layout_marginRight="@dimen/dimension_32dp"
-                android:layout_marginStart="26dp"
-                android:layout_marginEnd="@dimen/dimension_32dp"
                 android:text="@string/include_subdirectories"
                 android:textColor="@color/almost_white" />
 

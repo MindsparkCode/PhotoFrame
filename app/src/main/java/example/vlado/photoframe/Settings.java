@@ -7,7 +7,8 @@ package example.vlado.photoframe;
 public class Settings {
 
     private int delay;
-    private String photosFolderUrl;
+    private String photosFolderPath;
+    private boolean includeSubdirectories;
 
     public int getDelay() {
         return delay;
@@ -18,10 +19,29 @@ public class Settings {
     }
 
     public String getPhotosFolderPath() {
-        return photosFolderUrl;
+        return photosFolderPath;
     }
 
     public void setPhotosFolderPath(String photosFolderUrl) {
-        this.photosFolderUrl = photosFolderUrl;
+        this.photosFolderPath = photosFolderUrl;
+    }
+
+    public boolean isIncludeSubdirectories() {
+        return includeSubdirectories;
+    }
+
+    public void setIncludeSubdirectories(boolean includeSubdirectories) {
+        this.includeSubdirectories = includeSubdirectories;
+    }
+
+    public int getDelayInMs() {
+        return delay * 1000;
+    }
+
+    public boolean equals(Settings settings) {
+        return  delay == settings.delay &&
+                ((photosFolderPath == settings.photosFolderPath) ||
+                (photosFolderPath != null && photosFolderPath.equals(settings.photosFolderPath))) &&
+                includeSubdirectories == settings.includeSubdirectories;
     }
 }

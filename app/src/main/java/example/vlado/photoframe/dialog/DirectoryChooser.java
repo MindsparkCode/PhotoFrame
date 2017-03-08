@@ -8,11 +8,11 @@ import android.os.Environment;
 import android.support.v7.app.AlertDialog;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -57,7 +57,7 @@ public class DirectoryChooser {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(context)
                 .setView(listView)
-                .setTitle(context.getString(R.string.choose_photo_folder))
+                .setTitle(context.getString(R.string.select_photo_folder))
                 .setPositiveButton(R.string.choose_current_folder, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
@@ -69,12 +69,18 @@ public class DirectoryChooser {
                 });
 
         dialog = builder.create();
-
-        refresh(Environment.getExternalStorageDirectory());
+        currentPath = Environment.getExternalStorageDirectory();
     }
 
     public void showDialog() {
         dialog.show();
+
+        if (currentPath.canRead()) {
+            refresh(currentPath);
+        } else {
+            Toast.makeText(context, R.string.cannot_read_sd_card, Toast.LENGTH_LONG).show();
+            dialog.dismiss();
+        }
     }
 
     public Dialog getDialog() {

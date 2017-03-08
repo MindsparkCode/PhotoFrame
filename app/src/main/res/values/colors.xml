@@ -12,8 +12,8 @@
     <color name="buttonDarkPressed">#444343</color>
     <color name="buttonDisabled">#55000000</color>
 
-    <color name="color_almost_white">#cdcdcd</color>
-
+    <color name="material_red">#d32f2f</color>
+    <color name="almost_white">#cdcdcd</color>
     <color name="material_dark">#ff303030</color>
 
 </resources>
